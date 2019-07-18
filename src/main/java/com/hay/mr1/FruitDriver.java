@@ -12,7 +12,7 @@ import org.apache.hadoop.util.ToolRunner;
 
 public class FruitDriver extends Configuration implements Tool {
 
-    private  Configuration configuration=null;
+    private Configuration configuration = null;
 
     public int run(String[] strings) throws Exception {
 
@@ -39,7 +39,7 @@ public class FruitDriver extends Configuration implements Tool {
     }
 
     public void setConf(Configuration configuration) {
-        this.configuration=configuration;
+        this.configuration = configuration;
     }
 
     public Configuration getConf() {
@@ -48,6 +48,6 @@ public class FruitDriver extends Configuration implements Tool {
 
     public static void main(String[] args) throws Exception {
         Configuration conf = HBaseConfiguration.create();
-        int i=ToolRunner.run(conf,new FruitDriver(),args);
+        int i = ToolRunner.run(conf, new FruitDriver(), args);
     }
 }

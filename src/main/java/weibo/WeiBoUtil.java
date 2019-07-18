@@ -17,9 +17,11 @@ public class WeiBoUtil {
 
     //获取配置 conf
     private static Configuration configuration = HBaseConfiguration.create();
+
     static {
         configuration.set("hbase.zookeeper.quorum", "192.168.0.113");
     }
+
     //创建命名空间
     public static void createNamespace(String ns) throws IOException {
         Connection connection = ConnectionFactory.createConnection(configuration);
@@ -32,8 +34,9 @@ public class WeiBoUtil {
         connection.close();
 
     }
+
     //创建表
-    public static void createTable(String tableName,int versions, String... columnFamily) throws IOException {
+    public static void createTable(String tableName, int versions, String... columnFamily) throws IOException {
         Connection connection = ConnectionFactory.createConnection(configuration);
         Admin admin = connection.getAdmin();
 
@@ -41,7 +44,7 @@ public class WeiBoUtil {
 
 
         //循环添加列族
-        for (String cf:columnFamily) {
+        for (String cf : columnFamily) {
             HColumnDescriptor hColumnDescriptor = new HColumnDescriptor(cf);
             hColumnDescriptor.setMaxVersions(versions);
             htabledescriptor.addFamily(hColumnDescriptor);
@@ -54,7 +57,7 @@ public class WeiBoUtil {
     }
 
     //发布微博
-    public static void createData(String uid,String content) throws IOException {
+    public static void createData(String uid, String content) throws IOException {
         Connection connection = ConnectionFactory.createConnection(configuration);
 
         //获取三张表对象
@@ -64,31 +67,31 @@ public class WeiBoUtil {
 
         long ts = System.currentTimeMillis();
 
-        String rowKey=uid+"_"+ts;
+        String rowKey = uid + "_" + ts;
 
         //生成put对象
         Put put = new Put(Bytes.toBytes(rowKey));
 
         //添加数据
-        put.addColumn(Bytes.toBytes("info"),Bytes.toBytes("content"),Bytes.toBytes(content));
+        put.addColumn(Bytes.toBytes("info"), Bytes.toBytes("content"), Bytes.toBytes(content));
         contTable.put(put);
 
         //获取关系表fans
-        Get get =new Get(Bytes.toBytes(uid));
+        Get get = new Get(Bytes.toBytes(uid));
         get.addFamily(Bytes.toBytes("fans"));
         Result result = relaTable.get(get);
         Cell[] cells = result.rawCells();
 
-        if (cells.length<=0){
+        if (cells.length <= 0) {
             return;
         }
 
         //更新fans收件表
-        List<Put> puts=new ArrayList<>();
-        for (Cell cell:cells) {
+        List<Put> puts = new ArrayList<>();
+        for (Cell cell : cells) {
             byte[] cloneQualifier = CellUtil.cloneQualifier(cell);
             Put inboxPut = new Put(cloneQualifier);
-            inboxPut.addColumn(Bytes.toBytes("info"),Bytes.toBytes(uid),ts,Bytes.toBytes(rowKey));
+            inboxPut.addColumn(Bytes.toBytes("info"), Bytes.toBytes(uid), ts, Bytes.toBytes(rowKey));
             puts.add(inboxPut);
         }
         inboxTable.put(puts);
@@ -102,17 +105,18 @@ public class WeiBoUtil {
     }
 
 
-
     //关注用户
-    /**1.在用户关系表
+
+    /**
+     * 1.在用户关系表
      * 添加操作的人（A）的attends
      * 添加被操作的人的fans
-     *
+     * <p>
      * 2.收件箱中
-     *  微博内容中获取3条微博
-     *  收件箱中添加操作人的关注者信息
+     * 微博内容中获取3条微博
+     * 收件箱中添加操作人的关注者信息
      **/
-    public static void addAttend(String uid,String ...uids) throws IOException {
+    public static void addAttend(String uid, String... uids) throws IOException {
         Connection connection = ConnectionFactory.createConnection(configuration);
 
         //获取三张表对象
@@ -123,16 +127,15 @@ public class WeiBoUtil {
         //操作者put对象
         Put relaput = new Put(Bytes.toBytes(uid));
 
-        ArrayList<Put> puts=new ArrayList<>();
+        ArrayList<Put> puts = new ArrayList<>();
 
 
-
-        for (String s:uids) {
-            relaput.addColumn(Bytes.toBytes("attends"),Bytes.toBytes(s),Bytes.toBytes(s));
+        for (String s : uids) {
+            relaput.addColumn(Bytes.toBytes("attends"), Bytes.toBytes(s), Bytes.toBytes(s));
 
             //创建被关注者（粉丝)的put对象
-            Put fansput=new Put(Bytes.toBytes(s));
-            fansput.addColumn(Bytes.toBytes("fans"),Bytes.toBytes(uid),Bytes.toBytes(uid));
+            Put fansput = new Put(Bytes.toBytes(s));
+            fansput.addColumn(Bytes.toBytes("fans"), Bytes.toBytes(uid), Bytes.toBytes(uid));
             puts.add(fansput);
         }
 
@@ -140,17 +143,16 @@ public class WeiBoUtil {
         relaTable.put(puts);
 
 
-
-        Put inboxPut=new Put(Bytes.toBytes(uid));
+        Put inboxPut = new Put(Bytes.toBytes(uid));
         //获取内容表被关注的人的rowKey
         for (String s : uids) {
-            Scan scan = new Scan(Bytes.toBytes(s),Bytes.toBytes(s+"|"));
+            Scan scan = new Scan(Bytes.toBytes(s), Bytes.toBytes(s + "|"));
             ResultScanner results = contTable.getScanner(scan);
             for (Result result : results) {
                 String rowkey = Bytes.toString(result.getRow());
                 String[] split = rowkey.split("_");
                 byte[] row = result.getRow();
-                inboxPut.addColumn(Bytes.toBytes("info"),Bytes.toBytes(s),Long.parseLong(split[1]),row);
+                inboxPut.addColumn(Bytes.toBytes("info"), Bytes.toBytes(s), Long.parseLong(split[1]), row);
             }
         }
 
@@ -165,17 +167,15 @@ public class WeiBoUtil {
     }
 
 
-
-
     //取关
+
     /**
-    * 1.删除操作者关注列族的要取关的用户
-    *   删除代取关用户fans列族的操作者
-      2.收件表
-     删除操作者待取关用户的信息
-    *
-    * */
-    public static void delAttend(String uid ,String... uids) throws IOException {
+     * 1.删除操作者关注列族的要取关的用户
+     * 删除代取关用户fans列族的操作者
+     * 2.收件表
+     * 删除操作者待取关用户的信息
+     */
+    public static void delAttend(String uid, String... uids) throws IOException {
         Connection connection = ConnectionFactory.createConnection(configuration);
 
         Table relaTable = connection.getTable(TableName.valueOf(Constant.RELATIONS));
@@ -188,8 +188,8 @@ public class WeiBoUtil {
         ArrayList<Delete> deletes = new ArrayList<>();
         for (String s : uids) {
             Delete fansDel = new Delete(Bytes.toBytes(s));
-            fansDel.addColumns(Bytes.toBytes("fans"),Bytes.toBytes(uid));
-            relaDel.addColumns(Bytes.toBytes("attends"),Bytes.toBytes(s));
+            fansDel.addColumns(Bytes.toBytes("fans"), Bytes.toBytes(uid));
+            relaDel.addColumns(Bytes.toBytes("attends"), Bytes.toBytes(s));
             deletes.add(fansDel);
         }
 
@@ -200,7 +200,7 @@ public class WeiBoUtil {
 
         Delete inboxDel = new Delete(Bytes.toBytes(uid));
         for (String s : uids) {
-            inboxDel.addColumns(Bytes.toBytes("info"),Bytes.toBytes(s));
+            inboxDel.addColumns(Bytes.toBytes("info"), Bytes.toBytes(s));
         }
         inboxTable.delete(inboxDel);
 
@@ -217,8 +217,8 @@ public class WeiBoUtil {
 
         Table inboxTable = connection.getTable(TableName.valueOf(Constant.INBOX));
         Table contTable = connection.getTable(TableName.valueOf(Constant.CONTENT));
-        
-        
+
+
         //收件箱表数据
         Get get = new Get(Bytes.toBytes(uid));
         get.setMaxVersions();
@@ -239,15 +239,13 @@ public class WeiBoUtil {
         for (Result result1 : results) {
             Cell[] cells1 = result1.rawCells();
             for (Cell cell : cells1) {
-                System.out.println("RK:"+Bytes.toString(CellUtil.cloneRow(cell))+",Content:"+
+                System.out.println("RK:" + Bytes.toString(CellUtil.cloneRow(cell)) + ",Content:" +
                         Bytes.toString(CellUtil.cloneValue(cell)));
             }
         }
 
 
     }
-
-
 
 
     //获取微博内容（查看某个人所有微博）
@@ -264,7 +262,7 @@ public class WeiBoUtil {
         for (Result result : results) {
             Cell[] cells = result.rawCells();
             for (Cell cell : cells) {
-                System.out.println("RK:"+Bytes.toString(CellUtil.cloneRow(cell))+",Content:"+
+                System.out.println("RK:" + Bytes.toString(CellUtil.cloneRow(cell)) + ",Content:" +
                         Bytes.toString(CellUtil.cloneValue(cell)));
             }
         }
